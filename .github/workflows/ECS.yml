@@ -1,41 +1,41 @@
-name: Entrega continua
+name: Entrega Contínua
 
 on:
   workflow_call:
 
 jobs:
-
+  
   ECS:
     runs-on: ubuntu-latest
-    steps:
-    - name: configurando credenciais da AWS
-      uses: aws-actions/configure-aws-credentials@v1
+    steps: 
+    - name: "Configure AWS Credentials"
+      uses: aws-actions/configure-aws-credentials@v5.0.0
       with:
-        aws-access-key-id: ${{ secrets.ID_CHAVE_ACESSO }}
-        aws-secret-access-key: ${{ secrets.CHAVE_SECRETA }}
-        aws-region: us-east-2
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-2 
     
     - name: Obtendo arquivo da tarefa
-      run: aws ecs describe-task-definition --task-definition Tarefa_API-GO --query taskDefinition > task-definition.json
-    
-    - name: copia do task-definition
-      run: cp task-definition.json task-definition.json.old
+      run: aws ecs describe-task-definition --task-definition Tarefa_API-GO --query --task-definition > taskdefinition.json
+
+    - name: Realizando cópia do arquivo task-definition
+      run: cp taskdefinition.json taskdefinition.json.old
     
     - name: Fill in the new image ID in the Amazon ECS task definition
       id: task-def
       uses: aws-actions/amazon-ecs-render-task-definition@v1
       with:
         task-definition: task-definition.json
-        container-name: Go
-        image: leonardosartorello/go_ci:${{github.run_number}}
+        container-name: go
+        image: omateusvalente/go_ci:{{githut.run_number}}
         environment-variables: |
           HOST=${{ secrets.DBHOST }}
+          DBPORT=${{ secrets.DBPORT }}
+          PORT=8000
           USER=${{ secrets.DBUSER }}
           PASSWORD=${{ secrets.DBPASSWORD }}
           DBNAME=${{ secrets.DBNAME }}
-          DBPORT=${{ secrets.DBPORT }}
-          PORT=8000
-          
+
     - name: Deploy Amazon ECS task definition
       uses: aws-actions/amazon-ecs-deploy-task-definition@v1
       with:
@@ -43,19 +43,16 @@ jobs:
         service: Servico_API-Go
         cluster: API-Go
         wait-for-service-stability: true
-        
+
     - name: Requisição
       continue-on-error: true
-      run: echo "REQUEST=0" >> $GITHUB_ENV ; sleep 30s ; wget LB-API-Go-908865819.us-east-2.elb.amazonaws.com:8000/leo || echo "REQUEST=1" >> $GITHUB_ENV        
-    
+      run: echo "REQUEST=0" >> $GITHUB_ENV ; sleep 30s ; wget dns:8000/mateus || echo "REQUEST=1" >> $GITHUB_ENV 
+
     - name: Deploy Amazon ECS task definition
       if: ${{ env.REQUEST != 0 }}
       uses: aws-actions/amazon-ecs-deploy-task-definition@v1
       with:
-        task-definition: task-definition.json.old
+        task-definition: taskdefinition.json.old
         service: Servico_API-Go
         cluster: API-Go
         wait-for-service-stability: true
-    
-    
-    
